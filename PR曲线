@@ -1,0 +1,144 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
+from sklearn.metrics import precision_recall_curve, auc
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler
+
+train_file_path = 'test1.xlsx'
+train_data = pd.read_excel(train_file_path)
+validation_file_path = '验证队列.xlsx'
+validation_data = pd.read_excel(validation_file_path)
+
+feature_columns = ['DR', 'Duration of DM', 'HbA1c', 'eGFR', 'Serum creatinine', 'TC', 'Urine protein excretion', 'FBG', 'BMI', 'Age', 'SBP', 'LDL']
+target_column = '病理分型'
+
+X_train_all = train_data[feature_columns].values
+y_train_all = train_data[target_column].values
+
+X_validation = validation_data[feature_columns].values
+y_validation = validation_data[target_column].values
+
+imputer = SimpleImputer(strategy='mean')
+X_train_all = imputer.fit_transform(X_train_all)
+X_validation = imputer.transform(X_validation)
+
+models = [
+    RandomForestClassifier(random_state=42),
+    GradientBoostingClassifier(random_state=42),
+    LogisticRegression(random_state=42, solver='liblinear', max_iter=1000),
+    SVC(random_state=42, probability=True),
+    DecisionTreeClassifier(random_state=42)
+]
+
+model_names = ['RF', 'LightGBM', 'LR', 'SVM', 'DT']
+colors = ['blue', 'green', 'red', 'purple', 'orange']
+n_iterations = 15
+internal_all_precision = {name: [] for name in model_names}
+internal_all_recall = {name: [] for name in model_names}
+internal_all_auprc = {name: [] for name in model_names}
+external_all_precision = {name: [] for name in model_names}
+external_all_recall = {name: [] for name in model_names}
+external_all_auprc = {name: [] for name in model_names}
+
+for _ in range(n_iterations):
+    X_train, X_test, y_train, y_test = train_test_split(X_train_all, y_train_all, test_size=0.2, random_state=None)
+
+    for model, name in zip(models, model_names):
+        model.fit(X_train, y_train)
+
+        y_pred_proba_internal = model.predict_proba(X_test)[:, 1]
+        precision_internal, recall_internal, _ = precision_recall_curve(y_test, y_pred_proba_internal)
+        auprc_internal = auc(recall_internal, precision_internal)
+
+        internal_all_precision[name].append(precision_internal)
+        internal_all_recall[name].append(recall_internal)
+        internal_all_auprc[name].append(auprc_internal)
+        y_pred_proba_external = model.predict_proba(X_validation)[:, 1]
+        precision_external, recall_external, _ = precision_recall_curve(y_validation, y_pred_proba_external)
+        auprc_external = auc(recall_external, precision_external)
+
+        external_all_precision[name].append(precision_external)
+        external_all_recall[name].append(recall_external)
+        external_all_auprc[name].append(auprc_external)
+
+plt.figure(figsize=(10, 8))
+for i, name in enumerate(model_names):
+    mean_recall = np.linspace(0, 1, 100)
+    precisions = []
+    for j in range(n_iterations):
+        precision = np.interp(mean_recall, internal_all_recall[name][j][::-1], internal_all_precision[name][j][::-1])
+        precisions.append(precision)
+    mean_precision = np.mean(precisions, axis=0)
+    mean_auprc = np.mean(internal_all_auprc[name])
+
+    plt.plot(mean_recall, mean_precision, label=f'{name} (AUPRC = {mean_auprc:.2f})', color=colors[i])
+
+random_guess_internal = len(y_test[y_test == 1]) / len(y_test)
+plt.axhline(y=random_guess_internal, color='k', linestyle='--', label=f'Random Guess (AUPRC = {random_guess_internal:.2f})')
+
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel('Recall')
+plt.ylabel('Precision')
+plt.legend(loc="lower left")
+plt.grid(True)
+
+plt.savefig('1-PR曲线.png', dpi=300)
+plt.show()
+
+plt.figure(figsize=(10, 8))
+for i, name in enumerate(model_names):
+    mean_recall = np.linspace(0, 1, 100)
+    precisions = []
+    for j in range(n_iterations):
+        precision = np.interp(mean_recall, external_all_recall[name][j][::-1], external_all_precision[name][j][::-1])
+        precisions.append(precision)
+    mean_precision = np.mean(precisions, axis=0)
+    mean_auprc = np.mean(external_all_auprc[name])
+
+    plt.plot(mean_recall, mean_precision, label=f'{name} (AUPRC = {mean_auprc:.2f})', color=colors[i])
+
+random_guess_external = len(y_validation[y_validation == 1]) / len(y_validation)
+plt.axhline(y=random_guess_external, color='k', linestyle='--', label=f'Random Guess (AUPRC = {random_guess_external:.2f})')
+
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel('Recall')
+plt.ylabel('Precision')
+plt.legend(loc="lower left")
+plt.grid(True)
+
+plt.savefig('1-PR曲线-外部验证队列.png', dpi=300)
+plt.show()
+plt.figure(figsize=(10, 6))
+internal_auprc_data = [internal_all_auprc[name] for name in model_names]
+bp = plt.boxplot(internal_auprc_data, tick_labels=model_names)
+for i, patch in enumerate(bp['boxes']):
+    patch.set_color(colors[i])
+for i, median in enumerate(bp['medians']):
+    median.set_color(colors[i])
+
+plt.ylabel('AUPRC')
+plt.grid(True)
+
+plt.savefig('1-PR-箱型图.png', dpi=300)
+plt.show()
+plt.figure(figsize=(10, 6))
+external_auprc_data = [external_all_auprc[name] for name in model_names]
+bp = plt.boxplot(external_auprc_data, tick_labels=model_names)
+for i, patch in enumerate(bp['boxes']):
+    patch.set_color(colors[i])
+for i, median in enumerate(bp['medians']):
+    median.set_color(colors[i])
+
+plt.ylabel('AUPRC')
+plt.grid(True)
+
+plt.savefig('1-PR-箱型图-外部验证.png', dpi=300)
+plt.show()

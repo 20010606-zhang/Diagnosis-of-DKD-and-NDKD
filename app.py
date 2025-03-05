@@ -10,8 +10,8 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 
-# 读取环境变量
-data_file_path = os.getenv('DATA_FILE_PATH')
+# 手动设置数据文件路径，需要根据实际情况修改
+data_file_path = "D:/Users/17927/Desktop/mechine study/test1.xlsx"
 
 # 设置 matplotlib 字体和负号显示
 plt.rcParams['font.family'] = 'Times New Roman'

@@ -12,6 +12,12 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 
+try:
+    import openpyxl
+except ImportError:
+    st.error("缺少 'openpyxl' 库，请使用 'pip install openpyxl' 或 'conda install openpyxl' 进行安装。")
+    raise
+
 # 手动设置数据文件路径为公开 URL
 data_file_path = "https://raw.githubusercontent.com/20010606-zhang/DKD/refs/heads/master/test1.xlsx"
 

@@ -1,6 +1,8 @@
 import streamlit as st
 import matplotlib
 import os
+import requests
+from io import BytesIO
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import shap
@@ -10,8 +12,8 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 
-# 手动设置数据文件路径，需要根据实际情况修改
-data_file_path = "D:/Users/17927/Desktop/mechine study/test1.xlsx"
+# 手动设置数据文件路径为公开 URL
+data_file_path = "https://example.com/path/to/test1.xlsx"
 
 # 设置 matplotlib 字体和负号显示
 plt.rcParams['font.family'] = 'Times New Roman'
@@ -34,19 +36,14 @@ if not os.path.exists(base_path):
 # 定义输出文件路径
 output_path = os.path.join(base_path, 'model_output.joblib')
 
-# 检查数据文件是否存在
-if data_file_path and os.path.exists(data_file_path):
-    def load_and_preprocess_data(file_path, feature_names, target_name):
-        """
-        从 Excel 文件中加载数据，并分离特征和目标变量
-        :param file_path: Excel 文件路径
-        :param feature_names: 特征名称列表
-        :param target_name: 目标变量名称
-        :return: 特征矩阵 X 和目标向量 y
-        """
-        data = pd.read_excel(file_path)
-        X = data[feature_names]
-        y = data[target_name]
+try:
+    response = requests.get(data_file_path)
+    response.raise_for_status()
+    data = pd.read_excel(BytesIO(response.content))
+    X = data[feature_names]
+    y = data[target_name]
+
+    def load_and_preprocess_data(X, y):
         return X, y
 
     def train_model(X, y):
@@ -71,15 +68,15 @@ if data_file_path and os.path.exists(data_file_path):
         explainer = shap.TreeExplainer(model)
         return explainer
 
-    def build_and_save_output(file_path, feature_names, target_name, output_path):
+    def build_and_save_output(X, y, feature_names, target_name, output_path):
         """
         构建模型、计算 SHAP 解释器，并将模型和解释器保存到指定文件
-        :param file_path: Excel 文件路径
+        :param X: 特征矩阵
+        :param y: 目标向量
         :param feature_names: 特征名称列表
         :param target_name: 目标变量名称
         :param output_path: 输出文件路径
         """
-        X, y = load_and_preprocess_data(file_path, feature_names, target_name)
         model, X_test = train_model(X, y)
         explainer = calculate_shap_values(model, X_test)
         joblib.dump([model, explainer, X_test], output_path)
@@ -87,7 +84,7 @@ if data_file_path and os.path.exists(data_file_path):
 
     # 检查输出文件是否存在，如果不存在则生成
     if not os.path.exists(output_path):
-        build_and_save_output(data_file_path, feature_names, target_name, output_path)
+        build_and_save_output(X, y, feature_names, target_name, output_path)
 
     # 加载输出文件
     model, explainer, X_test = joblib.load(output_path)
@@ -161,6 +158,8 @@ if data_file_path and os.path.exists(data_file_path):
                     st.error("SHAP 力图文件未找到。")
             except Exception as e:
                 st.error(f"生成可视化图表时出错: {e}")
-else:
-    st.error(f"数据文件路径未设置或文件 {data_file_path} 未找到，请检查。")
+except requests.RequestException as e:
+    st.error(f"下载文件时出错: {e}")
+except Exception as e:
+    st.error(f"发生未知错误: {e}")
     #streamlit run "D:\Users\17927\Desktop\mechine study\app.py"

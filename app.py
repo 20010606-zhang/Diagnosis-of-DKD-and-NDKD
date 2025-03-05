@@ -13,7 +13,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 
 # 手动设置数据文件路径为公开 URL
-data_file_path = "https://raw.githubusercontent.com/20010606-zhang/DKD/main/test1.xlsx"
+data_file_path = "https://raw.githubusercontent.com/20010606-zhang/DKD/master/test1.xlsx"
 
 # 设置 matplotlib 字体和负号显示
 plt.rcParams['font.family'] = 'Times New Roman'

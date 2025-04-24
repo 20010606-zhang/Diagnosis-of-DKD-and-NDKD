@@ -13,7 +13,7 @@ plt.rcParams['axes.unicode_minus'] = False
 df = pd.read_excel('test1.xlsx')
 
 # 划分特征和目标变量
-feature_names = ['DR', 'Duration of DM', 'HbA1c', 'Serum creatinine', 'TC', 'Urine protein excretion', 'FBG', 'BMI', 'Age', 'SBP', 'LDL', 'TG', 'ACR', 'DBP', 'HDL', '2hPBG', 'Duration of DN', 'Sex']
+feature_names = ['DR', 'Duration of DM', 'HbA1c', 'Serum creatinine', 'TC', 'Urine protein excretion', 'FBG', 'BMI', 'Age', 'SBP', 'LDL', 'TG', 'ACR', 'DBP', 'HDL', 'Duration of DN', 'Sex']
 target_name = 'Pathology type'
 X = df[feature_names]
 y = df[target_name]
@@ -48,12 +48,18 @@ feature_importance_df = pd.DataFrame({
 
 # 绘制特征重要性排名图
 plt.figure(figsize=(12, 8))
-plt.barh(feature_importance_df['Feature'], feature_importance_df['Importance'], color='skyblue')
+bars = plt.barh(feature_importance_df['Feature'], feature_importance_df['Importance'], color='skyblue')
 plt.xlabel('Importance', fontsize=14)
 plt.ylabel('Feature', fontsize=14)
-plt.title('All Feature Importance after RFE with RF', fontsize=16)
+plt.title('Feature Importance', fontsize=16)
 plt.xticks(fontsize=12)
-plt.yticks(fontsize=12)
+plt.yticks(fontsize=12, rotation=40)  # 旋转标签（0为水平）
 plt.gca().invert_yaxis()
+
+# 在每个条形上添加重要性数值标签
+for bar in bars:
+    width = bar.get_width()
+    plt.text(width, bar.get_y() + bar.get_height()/2, f'{width:.3f}', ha='left', va='center', fontsize=10)
+
 plt.savefig("重要性排序.png", format='png', bbox_inches='tight')
 plt.show()

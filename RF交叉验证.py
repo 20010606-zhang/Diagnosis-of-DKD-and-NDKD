@@ -19,23 +19,20 @@ except FileNotFoundError:
     print("文件未找到，请检查文件路径。")
     raise
 
-feature_names = ['DR', 'Duration of DM', 'HbA1c', 'Serum creatinine', 'TC', 'Urine protein excretion', 'FBG', 'BMI', 'Age', 'SBP']
+feature_names = ['DR', 'Duration of DM', 'HbA1c', 'Serum creatinine', 'TC', 'Urine protein excretion', 'FBG', 'BMI', 'LDL', 'SBP']
 target_name = 'Pathology type'
 
 X = df[feature_names]
 y = df[target_name]
 
-mean_columns = ['Duration of DM', 'HbA1c', 'Serum creatinine', 'TC', 'Urine protein excretion', 'FBG', 'BMI', 'Age', 'SBP']
-median_columns = ['DR']
-
+# 仅对数值型特征进行均值填充（移除Sex列的填充）
+mean_columns = ['Duration of DM', 'HbA1c', 'Serum creatinine', 'TC', 'Urine protein excretion', 'FBG', 'BMI', 'LDL', 'SBP']
 mean_imputer = SimpleImputer(strategy='mean')
-median_imputer = SimpleImputer(strategy='median')
-
 X_mean = pd.DataFrame(mean_imputer.fit_transform(X[mean_columns]), columns=mean_columns)
-X_median = pd.DataFrame(median_imputer.fit_transform(X[median_columns]), columns=median_columns)
 
-X = pd.concat([X_mean, X_median], axis=1)
-X = X[feature_names]
+# 直接拼接已编码的'Sex'列
+X = pd.concat([X_mean, X[['DR']]], axis=1)
+X = X[feature_names]  # 确保列顺序与feature_names一致
 
 # 将目标变量 y 合并到特征矩阵 X 中
 data_with_target = pd.concat([X, y], axis=1)
@@ -162,14 +159,11 @@ for metric, scores in metrics.items():
 results_df = pd.DataFrame(results, columns=['Metric', 'Mean', 'Std'])
 
 # 保存为 Excel 文件
-results_df.to_excel('cross_validation_metrics.xlsx', index=False)
+results_df.to_excel('cv5_cross_validation_metrics.xlsx', index=False)
 
 # 继续绘制 ROC 曲线
 plot_and_save_roc_cv(X_train, y_train, cv_5, rf_classifier, '5_fold_roc_curve.png')
 
-# 10 倍交叉验证
-cv_10 = StratifiedKFold(n_splits=10)
-plot_and_save_roc_cv(X_train, y_train, cv_10, rf_classifier, '10_fold_roc_curve.png')
 
 # 保存模型
 joblib.dump(rf_classifier, 'random_forest_model.joblib')

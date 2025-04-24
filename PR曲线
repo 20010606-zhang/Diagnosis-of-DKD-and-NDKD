@@ -92,30 +92,6 @@ plt.grid(True)
 plt.savefig('1-PR曲线.png', dpi=300)
 plt.show()
 
-plt.figure(figsize=(10, 8))
-for i, name in enumerate(model_names):
-    mean_recall = np.linspace(0, 1, 100)
-    precisions = []
-    for j in range(n_iterations):
-        precision = np.interp(mean_recall, external_all_recall[name][j][::-1], external_all_precision[name][j][::-1])
-        precisions.append(precision)
-    mean_precision = np.mean(precisions, axis=0)
-    mean_auprc = np.mean(external_all_auprc[name])
-
-    plt.plot(mean_recall, mean_precision, label=f'{name} (AUPRC = {mean_auprc:.2f})', color=colors[i])
-
-random_guess_external = len(y_validation[y_validation == 1]) / len(y_validation)
-plt.axhline(y=random_guess_external, color='k', linestyle='--', label=f'Random Guess (AUPRC = {random_guess_external:.2f})')
-
-plt.xlim([0.0, 1.0])
-plt.ylim([0.0, 1.05])
-plt.xlabel('Recall')
-plt.ylabel('Precision')
-plt.legend(loc="lower left")
-plt.grid(True)
-
-plt.savefig('1-PR曲线-外部验证队列.png', dpi=300)
-plt.show()
 plt.figure(figsize=(10, 6))
 internal_auprc_data = [internal_all_auprc[name] for name in model_names]
 bp = plt.boxplot(internal_auprc_data, tick_labels=model_names)
@@ -128,17 +104,4 @@ plt.ylabel('AUPRC')
 plt.grid(True)
 
 plt.savefig('1-PR-箱型图.png', dpi=300)
-plt.show()
-plt.figure(figsize=(10, 6))
-external_auprc_data = [external_all_auprc[name] for name in model_names]
-bp = plt.boxplot(external_auprc_data, tick_labels=model_names)
-for i, patch in enumerate(bp['boxes']):
-    patch.set_color(colors[i])
-for i, median in enumerate(bp['medians']):
-    median.set_color(colors[i])
-
-plt.ylabel('AUPRC')
-plt.grid(True)
-
-plt.savefig('1-PR-箱型图-外部验证.png', dpi=300)
 plt.show()

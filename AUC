@@ -13,8 +13,6 @@ from sklearn.preprocessing import StandardScaler
 train_file_path = 'test1.xlsx'
 train_data = pd.read_excel(train_file_path)
 
-validation_file_path = '验证队列.xlsx'
-validation_data = pd.read_excel(validation_file_path)
 
 feature_columns = ['DR', 'Duration of DM', 'HbA1c', 'eGFR', 'Serum creatinine', 'TC', 'Urine protein excretion', 'FBG', 'BMI', 'Age', 'SBP', 'LDL']
 target_column = '病理分型'
@@ -91,27 +89,6 @@ plt.grid(True)
 plt.savefig('1-ROC曲线', dpi=300)
 plt.show()
 
-plt.figure(figsize=(10, 8))
-for i, name in enumerate(model_names):
-    mean_fpr = np.linspace(0, 1, 100)
-    tprs = []
-    for j in range(n_iterations):
-        tpr = np.interp(mean_fpr, val_all_fpr[name][j], val_all_tpr[name][j])
-        tpr[0] = 0.0
-        tprs.append(tpr)
-    mean_tpr = np.mean(tprs, axis=0)
-    mean_tpr[-1] = 1.0
-    mean_auc = np.mean(val_all_auc[name])
-    plt.plot(mean_fpr, mean_tpr, label=f'{name} (AUC = {mean_auc:.2f})', color=colors[i])
-plt.plot([0, 1], [0, 1], 'k--', label='Random Guess (AUC = 0.50)')
-plt.xlim([0.0, 1.0])
-plt.ylim([0.0, 1.05])
-plt.xlabel('False Positive Rate')
-plt.ylabel('True Positive Rate')
-plt.legend(loc="lower right")
-plt.grid(True)
-plt.savefig('1-ROC曲线-外部验证队列.png', dpi=300)
-plt.show()
 
 plt.figure(figsize=(10, 6))
 train_auc_data = [train_all_auc[name] for name in model_names]
@@ -123,16 +100,4 @@ for i, median in enumerate(bp['medians']):
 plt.ylabel('AUC')
 plt.grid(True)
 plt.savefig('1-ROC-箱型图.png', dpi=300)
-plt.show()
-
-plt.figure(figsize=(10, 6))
-val_auc_data = [val_all_auc[name] for name in model_names]
-bp = plt.boxplot(val_auc_data, tick_labels=model_names)
-for i, patch in enumerate(bp['boxes']):
-    patch.set_color(colors[i])
-for i, median in enumerate(bp['medians']):
-    median.set_color(colors[i])
-plt.ylabel('AUC')
-plt.grid(True)
-plt.savefig('1-ROC-箱型图-外部验证队列.png', dpi=300)
 plt.show()

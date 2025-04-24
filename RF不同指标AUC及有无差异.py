@@ -21,23 +21,22 @@ except FileNotFoundError:
     print("文件未找到，请检查文件路径。")
     raise
 
-feature_names = ['DR', 'Duration of DM', 'HbA1c', 'Serum creatinine', 'TC', 'Urine protein excretion', 'FBG', 'BMI', 'Age', 'SBP', 'LDL', 'TG', 'ACR', 'DBP', 'HDL', '2hPBG', 'Duration of DN', 'Sex']
+feature_names = ['DR', 'Duration of DM', 'HbA1c', 'Serum creatinine', 'TC', 'Urine protein excretion', 'FBG', 'BMI', 'Age', 'SBP', 'LDL', 'TG', 'ACR', 'DBP', 'HDL', 'Duration of DN', 'Sex']
 target_name = 'Pathology type'
 
 X = df[feature_names]
 y = df[target_name]
 
-mean_columns = ['Duration of DM', 'HbA1c', 'Serum creatinine', 'TC', 'Urine protein excretion', 'FBG', 'BMI', 'Age', 'SBP', 'LDL', 'TG', 'ACR', 'DBP', 'HDL', '2hPBG', 'Duration of DN']
-median_columns = ['DR', 'Sex']
-
+# 仅对数值型特征进行均值填充（移除Sex列的填充）
+mean_columns = ['Duration of DM', 'HbA1c', 'Serum creatinine', 'TC',
+                'Urine protein excretion', 'FBG', 'BMI', 'Age', 'SBP',
+                'LDL', 'TG', 'ACR', 'DBP', 'HDL', 'Duration of DN']
 mean_imputer = SimpleImputer(strategy='mean')
-median_imputer = SimpleImputer(strategy='median')
-
 X_mean = pd.DataFrame(mean_imputer.fit_transform(X[mean_columns]), columns=mean_columns)
-X_median = pd.DataFrame(median_imputer.fit_transform(X[median_columns]), columns=median_columns)
 
-X = pd.concat([X_mean, X_median], axis=1)
-X = X[feature_names]
+# 直接拼接已编码的'Sex'列
+X = pd.concat([X_mean, X[['Sex', 'DR']]], axis=1)
+X = X[feature_names]  # 确保列顺序与feature_names一致
 
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42, stratify=y
@@ -56,7 +55,7 @@ rankings = rfe.ranking_
 sorted_indices = sorted(range(len(rankings)), key=lambda k: rankings[k])
 
 # 要绘制AUC曲线的特征数量
-selected_feature_counts = [3, 9, 10, 18]
+selected_feature_counts = [3, 9, 10, 17]
 
 # 存储预测概率和AUC值
 y_preds = []
@@ -65,7 +64,7 @@ aucs = []
 plt.figure(figsize=(12, 8))
 
 # 自定义图例名称
-legend_names = ["RF models with 3 Features", "RF models with 9 Features", "RF models with 10 Features", "RF models with 18 Features"]
+legend_names = ["RF models with 3 Features", "RF models with 9 Features", "RF models with 10 Features", "RF models with 17 Features"]
 
 for i, num_features in enumerate(selected_feature_counts):
     selected_features_train = X_train.iloc[:, sorted_indices[:num_features]]

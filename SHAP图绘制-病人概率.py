@@ -32,13 +32,10 @@ def load_and_preprocess_data(file_path, feature_names, target_name):
     print("目标变量的唯一值:", y.unique())
 
     # 数据预处理：缺失值填充
-    mean_columns = ['Duration of DM', 'HbA1c', 'Serum creatinine', 'TC', 'Urine protein excretion', 'FBG', 'BMI', 'Age', 'SBP']
-    median_columns = ['DR']
+    mean_columns = ['Duration of DM', 'HbA1c', 'Serum creatinine', 'TC', 'Urine protein excretion', 'FBG', 'BMI', 'LDL', 'SBP']
     mean_imputer = SimpleImputer(strategy='mean')
-    median_imputer = SimpleImputer(strategy='median')
     X_mean = pd.DataFrame(mean_imputer.fit_transform(X[mean_columns]), columns=mean_columns)
-    X_median = pd.DataFrame(median_imputer.fit_transform(X[median_columns]), columns=median_columns)
-    X = pd.concat([X_mean, X_median], axis=1)[feature_names]
+    X = pd.concat([X_mean, X[['DR']]], axis=1)[feature_names]
 
     # 保存处理后的数据
     data_with_target = pd.concat([X, y], axis=1)
@@ -79,7 +76,7 @@ def convert_html_to_image(html_file, image_file):
         print(f"转换 HTML 为图片时出错: {e}")
 
 # 定义特征和目标变量
-feature_names = ['DR', 'Duration of DM', 'HbA1c', 'Serum creatinine', 'TC', 'Urine protein excretion', 'FBG', 'BMI', 'Age', 'SBP']
+feature_names = ['DR', 'Duration of DM', 'HbA1c', 'Serum creatinine', 'TC', 'Urine protein excretion', 'FBG', 'BMI', 'LDL', 'SBP']
 target_name = 'Pathology type'
 
 # 加载并预处理数据
@@ -91,11 +88,11 @@ rf_classifier, X_test = train_model(X, y)
 # 计算 SHAP 值
 explainer, shap_values = calculate_shap_values(rf_classifier, X_test)
 
-sample_index = 268
+sample_index = 5
 sample_shap_values = shap_values[sample_index].reshape(1, -1)
 sample_features = X_test.iloc[sample_index].values.reshape(1, -1)
 force_plot = shap.force_plot(explainer.expected_value[1], sample_shap_values, sample_features, feature_names=feature_names)
-shap.save_html('shap_force_plot-阳性.html', force_plot)
+shap.save_html('shap_force_plot.html', force_plot)
 
 # 绘制并保存瀑布图
 plt.figure(figsize=(8, 20))  # 适当增大高度
@@ -104,8 +101,5 @@ shap.plots.waterfall(shap.Explanation(values=sample_shap_values[0],
                                       base_values=explainer.expected_value[1],
                                       data=sample_features[0],
                                       feature_names=feature_names))
-plt.savefig('shap_waterfall_plot-阳性.png', dpi=300)
+plt.savefig('shap_waterfall_plot.png', dpi=300)
 plt.close()
-
-# 将 HTML 转换为图片
-convert_html_to_image('shap_force_plot-阳性.html', 'shap_force_plot-阳性.png')

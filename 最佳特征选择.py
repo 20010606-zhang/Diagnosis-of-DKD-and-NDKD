@@ -24,39 +24,31 @@ except FileNotFoundError:
     print("文件未找到，请检查文件路径。")
     raise
 
-feature_names = ['DR', 'Duration of DM', 'HbA1c', 'Serum creatinine', 'TC', 'Urine protein excretion', 'FBG', 'BMI', 'Age', 'SBP', 'LDL', 'TG', 'ACR', 'DBP', 'HDL', '2hPBG', 'Duration of DN', 'Sex']
+feature_names = ['DR', 'Duration of DM', 'HbA1c', 'Serum creatinine', 'TC',
+                 'Urine protein excretion', 'FBG', 'BMI', 'Age', 'SBP',
+                 'LDL', 'TG', 'ACR', 'DBP', 'HDL', 'Duration of DN', 'Sex']
 target_name = 'Pathology type'
 
 X = df[feature_names]
 y = df[target_name]
 
-mean_columns = ['Duration of DM', 'HbA1c', 'Serum creatinine', 'TC', 'Urine protein excretion', 'FBG', 'BMI', 'Age', 'SBP', 'LDL', 'TG', 'ACR', 'DBP', 'HDL', '2hPBG', 'Duration of DN']
-median_columns = ['DR', 'Sex']
-
+# 仅对数值型特征进行均值填充（移除Sex列的填充）
+mean_columns = ['Duration of DM', 'HbA1c', 'Serum creatinine', 'TC',
+                'Urine protein excretion', 'FBG', 'BMI', 'Age', 'SBP',
+                'LDL', 'TG', 'ACR', 'DBP', 'HDL', 'Duration of DN']
 mean_imputer = SimpleImputer(strategy='mean')
-median_imputer = SimpleImputer(strategy='median')
-
 X_mean = pd.DataFrame(mean_imputer.fit_transform(X[mean_columns]), columns=mean_columns)
-X_median = pd.DataFrame(median_imputer.fit_transform(X[median_columns]), columns=median_columns)
 
-X = pd.concat([X_mean, X_median], axis=1)
-X = X[feature_names]
+# 直接拼接已编码的'Sex'列
+X = pd.concat([X_mean, X[['Sex', 'DR']]], axis=1)
+X = X[feature_names]  # 确保列顺序与feature_names一致
 
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42, stratify=y
 )
 
+
 def perform_rfe_single_model(model, X_train, y_train, X_test, y_test, model_name):
-    """
-    对单个模型执行 RFE 并计算不同特征子集的 ROC AUC 分数
-    :param model: 模型对象
-    :param X_train: 训练集特征
-    :param y_train: 训练集目标变量
-    :param X_test: 测试集特征
-    :param y_test: 测试集目标变量
-    :param model_name: 模型名称
-    :return: 包含特征数量和对应 ROC AUC 分数的 DataFrame
-    """
     feature_count = len(X_train.columns)
     step = 1
     rfe = RFE(estimator=model, n_features_to_select=1, step=step)
@@ -89,12 +81,13 @@ def perform_rfe_single_model(model, X_train, y_train, X_test, y_test, model_name
     })
     return results_df
 
+
 models = {
     "RF": RandomForestClassifier(random_state=42),
     "DT": DecisionTreeClassifier(random_state=42),
     "LightGBM": LGBMClassifier(random_state=42, verbose=-1),
     "XGBoost": XGBClassifier(eval_metric='logloss', random_state=42),
-    "LR": LogisticRegression(random_state=42, max_iter=20000)
+    "LR": LogisticRegression(random_state=42, max_iter=500000)
 }
 
 results_df = None
@@ -117,50 +110,43 @@ if results_df is not None:
     results_df.reset_index(drop=True, inplace=True)
     print(results_df)
 
-    # 筛选出满足步长为1、初始值为1的行
-    step_size = 1  # 步长设置为1
-    initial_value = 1  # 初始值设置为1
-    # 筛选满足条件的数据行：特征数量 >= 初始值，并按步长取样
+    step_size = 1
+    initial_value = 1
     filtered_results_df = results_df[
-        results_df["Number_of_Features"] >= initial_value  # 筛选特征数量大于等于初始值的行
-    ].iloc[::step_size, :].reset_index(drop=True)  # 按步长取样，并重置索引
-    # 按 "Number_of_Features" 列从大到小排序
+                              results_df["Number_of_Features"] >= initial_value
+                              ].iloc[::step_size, :].reset_index(drop=True)
     filtered_results_df.sort_values(by="Number_of_Features", ascending=False, inplace=True)
 
-    # 绘制图形
-    plt.figure(figsize=(12, 8))  # 设置画布大小
-    for column in filtered_results_df.columns[1:]:  # 遍历所有模型的列（从第2列开始）
+    plt.figure(figsize=(12, 8))
+    for column in filtered_results_df.columns[1:]:
         plt.plot(
-            filtered_results_df["Number_of_Features"],  # X轴：特征数量
-            filtered_results_df[column],  # Y轴：对应模型的AUC分数
-            label=column,  # 设置图例为模型名称
-            marker='o',  # 在曲线上标记点
-            linewidth=1.5  # 设置线条宽度
+            filtered_results_df["Number_of_Features"],
+            filtered_results_df[column],
+            label=column,
+            marker='o',
+            linewidth=1.5
         )
 
-    # 绘制最佳特征数量的垂直虚线
     optimal_features = 10  # 最佳特征数量
     plt.axvline(
-        x=optimal_features,  # 垂直线的位置
-        color='black',  # 设置线的颜色为黑色
-        linestyle='--',  # 设置线型为虚线
-        label='Optimal Features'  # 图例说明
+        x=optimal_features,
+        color='black',
+        linestyle='--',
+        label='Optimal Features'
     )
 
-    # 设置图表标题和坐标轴标签
-    plt.title('Feature Reduction (Step=1, Initial=1)', fontsize=16)  # 图表标题
-    plt.xlabel('Number of Features', fontsize=14)  # X轴标签
-    plt.ylabel('Area Under the ROC Curve (AUC)', fontsize=14)  # Y轴标签
-    # 设置X轴的刻度值和字体大小
+    plt.title('Feature Reduction (Step=1, Initial=1)', fontsize=16)
+    plt.xlabel('Number of Features', fontsize=14)
+    plt.ylabel('Area Under the ROC Curve (AUC)', fontsize=14)
     plt.xticks(
-        ticks=filtered_results_df["Number_of_Features"],  # 设置刻度值为筛选后的特征数量
-        fontsize=10  # 设置字体大小
+        ticks=filtered_results_df["Number_of_Features"],
+        fontsize=10
     )
-    plt.yticks(fontsize=12)  # 设置Y轴字体大小
-    plt.legend(title="Models", fontsize=12, loc="best")  # 图例标题、字体大小及位置
-    plt.grid(axis='y', alpha=0.5)  # 添加Y轴方向的网格线，并设置透明度
-    plt.gca().spines['top'].set_visible(False)  # 隐藏顶部边框
-    plt.gca().spines['right'].set_visible(False)  # 隐藏右侧边框
+    plt.yticks(fontsize=12)
+    plt.legend(title="Models", fontsize=12, loc="best")
+    plt.grid(axis='y', alpha=0.5)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
     plt.savefig("最佳特征选择.png", format='png', bbox_inches='tight')
     plt.tight_layout()
     plt.show()

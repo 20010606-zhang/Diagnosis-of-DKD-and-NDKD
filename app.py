@@ -100,7 +100,7 @@ try:
 
     # 添加输入组件让用户输入指标值
 
-    input_features = [st.number_input(f"输入 {feature} 的值", step=0.01) for feature in feature_names]
+    input_features = [st.number_input(f" {feature} ", step=0.01) for feature in feature_names]
 
     if st.button("查看结果"):
         input_features = np.array([input_features])

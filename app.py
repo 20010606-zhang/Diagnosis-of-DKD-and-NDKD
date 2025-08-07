@@ -102,7 +102,7 @@ try:
 
     input_features = [st.number_input(f" {feature} ", step=0.01) for feature in feature_names]
 
-    if st.button("查看结果"):
+    if st.button("Results"):
         input_features = np.array([input_features])
         # 计算输入样本的 SHAP 值
         shap_values = explainer.shap_values(input_features)

@@ -99,7 +99,7 @@ try:
     st.write("训练数据特征数量: ", X_test.shape[1])
 
     # 添加输入组件让用户输入指标值
-    st.subheader("Please enter indicator values")
+
     input_features = [st.number_input(f"输入 {feature} 的值", step=0.01) for feature in feature_names]
 
     if st.button("查看结果"):

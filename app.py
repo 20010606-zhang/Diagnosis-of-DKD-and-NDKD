@@ -3,169 +3,175 @@ import matplotlib
 import os
 import requests
 from io import BytesIO
-matplotlib.use('Agg')
+
+matplotlib.use('Agg')  # Non-interactive backend to avoid plotting errors
 import matplotlib.pyplot as plt
 import shap
 import numpy as np
 import joblib
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
+from sklearn.impute import SimpleImputer  # Reuse local missing value handling logic
+import warnings
 
-try:
-    import openpyxl
-except ImportError:
-    st.error("缺少 'openpyxl' 库，请使用 'pip install openpyxl' 或 'conda install openpyxl' 进行安装。")
-    raise
+warnings.filterwarnings("ignore")  # Ignore redundant warnings
 
-# 手动设置数据文件路径为公开 URL
-data_file_path = "https://raw.githubusercontent.com/20010606-zhang/DKD/refs/heads/master/test1.xlsx"
-
-# 设置 matplotlib 字体和负号显示
+# -------------------------- 1. Basic Configuration (Fonts, Paths, Feature Definitions) --------------------------
+# Set matplotlib fonts and negative sign display (consistent with local training code)
 plt.rcParams['font.family'] = 'Times New Roman'
 plt.rcParams['axes.unicode_minus'] = False
 
-# 定义特征和目标变量
+# Define features and target variable (must match local training code exactly!)
 feature_names = ['DR', 'Duration of DM', 'HbA1c', 'Serum creatinine', 'TC', 'Urine protein excretion', 'FBG', 'BMI']
 target_name = 'Pathology type'
 
-# Streamlit 应用标题
-st.title("SHAP 模型可视化应用")
+# Streamlit app title
+st.title("SHAP Model Visualization App (Based on Local Trained Model)")
 
-# 定义基础路径为当前脚本所在目录
-base_path = os.getcwd()
+# Define file paths (locally trained model and data files should be in the same directory as the Streamlit script)
+local_model_path = "random_forest_model.joblib"  # Locally trained model
+local_data_path = "your_data.csv"  # Preprocessed data saved locally (for loading SimpleImputer rules)
+# If you don't have your_data.csv, you can use the original test1.xlsx, ensure the path is correct:
+# local_data_path = "test1.xlsx"
 
-# 检查基础路径是否存在，如果不存在则创建
-if not os.path.exists(base_path):
-    os.makedirs(base_path)
-
-# 定义输出文件路径
-output_path = os.path.join(base_path, 'model_output.joblib')
-
+# -------------------------- 2. Load Locally Trained Model and Preprocessing Components --------------------------
 try:
-    response = requests.get(data_file_path)
-    response.raise_for_status()
-    data = pd.read_excel(BytesIO(response.content))
-    X = data[feature_names]
-    y = data[target_name]
+    # 1. Load the locally trained random forest model
+    if not os.path.exists(local_model_path):
+        st.error(
+            f"Local model file not found: {local_model_path}, please place the locally trained model in the same directory as the script!")
+        st.stop()  # Stop running if model doesn't exist
+    model = joblib.load(local_model_path)
+    st.success("✅ Local random forest model loaded successfully!")
 
-    def load_and_preprocess_data(X, y):
-        return X, y
+    # 2. Load local data and re-initialize SimpleImputer (consistent with local training logic)
+    # (Purpose: Reuse mean imputation rules from training to avoid bias with user input or new data)
+    if os.path.exists(local_data_path):
+        if local_data_path.endswith(".csv"):
+            data = pd.read_csv(local_data_path)
+        else:  # For xlsx files
+            data = pd.read_excel(local_data_path)
+    else:
+        st.error(f"Local data file not found: {local_data_path}, please check the path!")
+        st.stop()
 
-    def train_model(X, y):
-        """
-        划分训练集和测试集，然后使用随机森林分类器进行训练
-        :param X: 特征矩阵
-        :param y: 目标向量
-        :return: 训练好的模型和测试集特征矩阵
-        """
-        X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.2, random_state=42)
-        rf_classifier = RandomForestClassifier(random_state=42)
-        rf_classifier.fit(X_train, y_train)
-        return rf_classifier, X_test
+    # Initialize mean imputer (only for numerical features, exactly matching local code)
+    mean_columns = ['Duration of DM', 'HbA1c', 'Serum creatinine', 'TC', 'Urine protein excretion', 'FBG', 'BMI']
+    mean_imputer = SimpleImputer(strategy='mean')
+    mean_imputer.fit(data[mean_columns])  # Fit with means from local training data (ensure consistent rules)
+    st.success("✅ Missing value handling component loaded successfully!")
 
-    def calculate_shap_values(model, X_test):
-        """
-        计算 SHAP 值
-        :param model: 训练好的模型
-        :param X_test: 测试集特征矩阵
-        :return: SHAP 解释器
-        """
-        explainer = shap.TreeExplainer(model)
-        return explainer
+    # 3. Generate SHAP explainer (based on loaded local model)
+    explainer = shap.TreeExplainer(model)
+    st.success("✅ SHAP explainer initialized successfully!")
 
-    def build_and_save_output(X, y, feature_names, target_name, output_path):
-        """
-        构建模型、计算 SHAP 解释器，并将模型和解释器保存到指定文件
-        :param X: 特征矩阵
-        :param y: 目标向量
-        :param feature_names: 特征名称列表
-        :param target_name: 目标变量名称
-        :param output_path: 输出文件路径
-        """
-        model, X_test = train_model(X, y)
-        explainer = calculate_shap_values(model, X_test)
-        joblib.dump([model, explainer, X_test], output_path)
-        print(f"输出已保存到 {output_path}")
-
-    # 检查输出文件是否存在，如果不存在则生成
-    if not os.path.exists(output_path):
-        build_and_save_output(X, y, feature_names, target_name, output_path)
-
-    # 加载输出文件
-    model, explainer, X_test = joblib.load(output_path)
-
-    st.write("特征名称:", feature_names)
-    st.write("训练数据特征数量: ", X_test.shape[1])
-
-    # 添加输入组件让用户输入指标值
-
-    input_features = [st.number_input(f" {feature} ", step=0.01) for feature in feature_names]
-
-    if st.button("Results"):
-        input_features = np.array([input_features])
-        # 计算输入样本的 SHAP 值
-        shap_values = explainer.shap_values(input_features)
-
-        # 检查 shap_values 的结构
-        if isinstance(shap_values, list):
-            # 对于多分类问题，shap_values 可能是列表
-            if len(shap_values) > 1:
-                # 选择正类（索引为 1）的 SHAP 值
-                sample_shap_values = shap_values[1].flatten()
-            else:
-                sample_shap_values = shap_values[0].flatten()
-        elif shap_values.ndim == 3:
-            # 对于二分类问题且 shap_values 是三维数组的情况
-            sample_shap_values = shap_values[:, :, 1].flatten()
-        else:
-            sample_shap_values = shap_values.flatten()
-
-        sample_features = input_features[0]
-
-        # 检查长度是否一致
-        print(f"SHAP 值长度: {len(sample_shap_values)}")
-        print(f"特征值长度: {len(sample_features)}")
-
-        if len(sample_shap_values) != len(sample_features):
-            st.error(f"SHAP 值长度 ({len(sample_shap_values)}) 与特征值长度 ({len(sample_features)}) 不匹配！")
-        else:
-            try:
-                # 绘制并保存力图
-                force_plot = shap.force_plot(
-                    explainer.expected_value[1] if len(explainer.expected_value) > 1 else explainer.expected_value[0],
-                    sample_shap_values, sample_features, feature_names=feature_names)
-                force_image_file = os.path.join(base_path, 'shap_force_plot.png')
-                shap.save_html(force_image_file, force_plot)  # 这里实际上是保存 HTML 文件
-
-                # 绘制并保存瀑布图
-                plt.figure(figsize=(8, 20))
-                plt.subplots_adjust(left=0.3)
-                shap.plots.waterfall(shap.Explanation(values=sample_shap_values,
-                                                      base_values=explainer.expected_value[1] if len(explainer.expected_value) > 1 else explainer.expected_value[0],
-                                                      data=sample_features,
-                                                      feature_names=feature_names))
-                waterfall_image_file = os.path.join(base_path, 'shap_waterfall_plot.png')
-                plt.savefig(waterfall_image_file, dpi=300)
-                plt.close()
-
-                # 显示瀑布图
-                if os.path.exists(waterfall_image_file):
-                    st.image(waterfall_image_file, caption='SHAP 瀑布图')
-                else:
-                    st.error("SHAP 瀑布图文件未找到。")
-                # 显示力图
-                if os.path.exists(force_image_file):
-                    import streamlit.components.v1 as components
-                    with open(force_image_file, 'r', encoding='utf-8') as f:
-                        html_content = f.read()
-                    components.html(html_content, height=400)
-                else:
-                    st.error("SHAP 力图文件未找到。")
-            except Exception as e:
-                st.error(f"生成可视化图表时出错: {e}")
-except requests.RequestException as e:
-    st.error(f"下载文件时出错: {e}")
 except Exception as e:
-    st.error(f"发生未知错误: {e}")
-    #streamlit run "D:\Users\17927\Desktop\mechine study\app.py"
+    st.error(f"Initialization failed: {str(e)}")
+    st.stop()
+
+# -------------------------- 3. Streamlit User Input Components --------------------------
+st.subheader("Please Enter Patient Metrics")
+# Generate user input fields (in feature order, supporting numerical input with step=0.01 for precision)
+input_features = []
+for feature in feature_names:
+    # Set reasonable input ranges based on feature meaning (optional, improves user experience)
+    if feature == "DR":  # Assuming DR is a categorical feature (e.g., 0/1)
+        val = st.number_input(f"{feature} (0=Absent, 1=Present)", min_value=0, max_value=1, step=1, value=0)
+    elif feature == "Duration of DM":  # Diabetes duration (years)
+        val = st.number_input(f"{feature} (years)", min_value=0.0, max_value=50.0, step=0.1, value=10.0)
+    elif feature in ["HbA1c", "FBG"]:  # Blood glucose related metrics
+        val = st.number_input(f"{feature}", min_value=3.0, max_value=20.0, step=0.1, value=7.0)
+    elif feature == "Serum creatinine":  # Serum creatinine (μmol/L)
+        val = st.number_input(f"{feature} (μmol/L)", min_value=30.0, max_value=500.0, step=1.0, value=80.0)
+    elif feature == "TC":  # Total cholesterol (mmol/L)
+        val = st.number_input(f"{feature} (mmol/L)", min_value=2.0, max_value=10.0, step=0.1, value=5.0)
+    elif feature == "Urine protein excretion":  # Urine protein excretion rate (g/24h)
+        val = st.number_input(f"{feature} (g/24h)", min_value=0.0, max_value=10.0, step=0.01, value=0.5)
+    elif feature == "BMI":  # Body mass index
+        val = st.number_input(f"{feature}", min_value=15.0, max_value=40.0, step=0.1, value=25.0)
+    input_features.append(val)
+
+# -------------------------- 4. Model Prediction and SHAP Visualization --------------------------
+if st.button("Generate Prediction Results and SHAP Analysis"):
+    try:
+        # 1. Process user input (convert to array, match model input format)
+        input_arr = np.array(input_features).reshape(1, -1)
+        input_df = pd.DataFrame(input_arr, columns=feature_names)
+
+        # 2. Apply missing value imputation to user input (consistent with local training logic)
+        input_df[mean_columns] = mean_imputer.transform(input_df[mean_columns])
+        st.subheader("✅ Processed Input Features")
+        st.dataframe(input_df.round(2))  # Display processed input for user confirmation
+
+        # 3. Model prediction (output class and probability)
+        y_pred = model.predict(input_df)[0]
+        y_pred_proba = model.predict_proba(input_df)[0].max()  # Prediction probability (maximum probability)
+        st.subheader("📊 Model Prediction Results")
+        st.write(f"Predicted pathology type: **{y_pred}**")
+        st.write(f"Prediction confidence: **{y_pred_proba:.2%}**")
+
+        # 4. Calculate SHAP values (explain prediction results)
+        shap_values = explainer.shap_values(input_df)
+        # Handle SHAP value structure for multi-class/binary classification (compatible with different cases)
+        if isinstance(shap_values, list):  # Multi-class: take SHAP values for positive class (or target class)
+            if len(shap_values) > 1:
+                sample_shap = shap_values[1].flatten()  # Assuming 1 is positive class, adjust as needed
+            else:
+                sample_shap = shap_values[0].flatten()
+        else:  # Binary classification: directly take 2D array
+            sample_shap = shap_values.flatten()
+
+        # Check if SHAP values match number of features (avoid visualization errors)
+        if len(sample_shap) != len(feature_names):
+            st.error(
+                f"SHAP value length ({len(sample_shap)}) does not match number of features ({len(feature_names)})!")
+            st.stop()
+
+        # 5. Plot and display SHAP waterfall plot (explain each feature's contribution)
+        st.subheader("🔍 SHAP Waterfall Plot (Feature Contribution Analysis)")
+        plt.figure(figsize=(10, 6))
+        # Construct SHAP explanation object (base_values is model expected value)
+        shap_exp = shap.Explanation(
+            values=sample_shap,
+            base_values=explainer.expected_value[1] if isinstance(explainer.expected_value,
+                                                                  list) else explainer.expected_value,
+            data=input_df.iloc[0].values,
+            feature_names=feature_names
+        )
+        shap.plots.waterfall(shap_exp, show=False)  # Don't display automatically, controlled by Streamlit
+        plt.tight_layout()  # Adjust layout to avoid label truncation
+        waterfall_path = "shap_waterfall.png"
+        plt.savefig(waterfall_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        st.image(waterfall_path,
+                 caption="Contribution of each feature to prediction (red=positive contribution, blue=negative contribution)")
+
+        # 6. Plot and display SHAP force plot (interactive HTML)
+        st.subheader("🔍 SHAP Force Plot (Intuitive Prediction Logic)")
+        # Calculate model expected value (base value)
+        base_value = explainer.expected_value[1] if isinstance(explainer.expected_value,
+                                                               list) else explainer.expected_value
+        # Generate force plot
+        force_plot = shap.force_plot(
+            base_value=base_value,
+            shap_values=sample_shap,
+            features=input_df.iloc[0],
+            feature_names=feature_names,
+            matplotlib=False  # Generate HTML format (interactive)
+        )
+        # Save as HTML and load in Streamlit
+        force_html_path = "shap_force.html"
+        shap.save_html(force_html_path, force_plot)
+        # Display HTML with Streamlit component
+        import streamlit.components.v1 as components
+
+        with open(force_html_path, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+        components.html(html_content, height=300)  # Adjust height as needed
+
+    except Exception as e:
+        st.error(f"Error during analysis: {str(e)}")
+
+# -------------------------- 5. Additional Tips (to help users) --------------------------
+st.sidebar.title("Usage Tips")
+st.sidebar.info(
+    "1. Please ensure entered metrics are within clinically reasonable ranges;\n2. In SHAP plots, red features indicate positive contribution to prediction, blue indicates negative contribution;\n3. The model is based on local training data. To update the model, replace the random_forest_model.joblib file.")

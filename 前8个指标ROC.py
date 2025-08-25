@@ -32,8 +32,7 @@ except FileNotFoundError:
     print("文件未找到，请检查文件路径。")
     raise
 
-feature_names = ['DR', 'Duration of DM', 'HbA1c', 'Serum creatinine', 'TC', 'Urine protein excretion', 'FBG', 'BMI',
-                 'Age', 'SBP', 'LDL', 'TG', 'ACR', 'DBP', 'HDL', 'Duration of DN', 'Sex']
+feature_names = ['DR', 'Duration of DM', 'HbA1c', 'Serum creatinine', 'TC', 'Urine protein excretion', 'FBG', 'BMI']
 target_name = 'Pathology type'
 
 X = df[feature_names]
@@ -41,13 +40,12 @@ y = df[target_name]
 
 # 仅对数值型特征进行均值填充
 mean_columns = ['Duration of DM', 'HbA1c', 'Serum creatinine', 'TC',
-                'Urine protein excretion', 'FBG', 'BMI', 'Age', 'SBP',
-                'LDL', 'TG', 'ACR', 'DBP', 'HDL', 'Duration of DN']
+                'Urine protein excretion', 'FBG', 'BMI']
 mean_imputer = SimpleImputer(strategy='mean')
 X_mean = pd.DataFrame(mean_imputer.fit_transform(X[mean_columns]), columns=mean_columns)
 
 # 拼接特征列
-X = pd.concat([X_mean, X[['Sex', 'DR']]], axis=1)
+X = pd.concat([X_mean, X[['DR']]], axis=1)
 X = X[feature_names]  # 确保列顺序与feature_names一致
 
 # 对数据进行标准化处理
@@ -180,51 +178,7 @@ plt.grid(True, alpha=0.5)
 # 去除顶部和右侧边框
 plt.gca().spines['top'].set_visible(False)
 plt.gca().spines['right'].set_visible(False)
-plt.savefig('5中模型全部指标ROC曲线', dpi=300, bbox_inches='tight')
+plt.savefig('5种模型前8指标ROC曲线', dpi=300, bbox_inches='tight')
 plt.tight_layout()
 plt.show()
 
-# 计算每个模型各项指标的平均值和标准差并保存
-results = []
-for name in model_names:
-    mean_auc = np.mean(all_metrics[name]['AUC'])
-    std_auc = np.std(all_metrics[name]['AUC'])
-
-    mean_sensitivity = np.mean(all_metrics[name]['Sensitivity'])
-    std_sensitivity = np.std(all_metrics[name]['Sensitivity'])
-
-    mean_specificity = np.mean(all_metrics[name]['Specificity'])
-    std_specificity = np.std(all_metrics[name]['Specificity'])
-
-    mean_ppv = np.mean(all_metrics[name]['PPV'])
-    std_ppv = np.std(all_metrics[name]['PPV'])
-
-    mean_npv = np.mean(all_metrics[name]['NPV'])
-    std_npv = np.std(all_metrics[name]['NPV'])
-
-    mean_accuracy = np.mean(all_metrics[name]['Accuracy'])
-    std_accuracy = np.std(all_metrics[name]['Accuracy'])
-
-    mean_f1 = np.mean(all_metrics[name]['F1-score'])
-    std_f1 = np.std(all_metrics[name]['F1-score'])
-
-    # 保存平均值和标准差
-    results.append([
-        name,
-        f"{mean_auc:.2f} ± {std_auc:.2f}",
-        f"{mean_sensitivity:.2f} ± {std_sensitivity:.2f}",
-        f"{mean_specificity:.2f} ± {std_specificity:.2f}",
-        f"{mean_ppv:.2f} ± {std_ppv:.2f}",
-        f"{mean_npv:.2f} ± {std_npv:.2f}",
-        f"{mean_accuracy:.2f} ± {std_accuracy:.2f}",
-        f"{mean_f1:.2f} ± {std_f1:.2f}"
-    ])
-
-# 创建DataFrame并保存到Excel
-results_df = pd.DataFrame(results,
-                          columns=['Model', 'AUC', 'Sensitivity', 'Specificity', 'PPV', 'NPV', 'Accuracy', 'F1-score'])
-
-with pd.ExcelWriter('5种模型性能比较.xlsx') as writer:
-    results_df.to_excel(writer, sheet_name='Model_Metrics', index=False)
-
-print("代码执行完成，结果已保存！")

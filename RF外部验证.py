@@ -1,11 +1,13 @@
 import joblib
 import pandas as pd
-from sklearn.impute import SimpleImputer
-from sklearn.metrics import roc_curve, roc_auc_score, precision_recall_curve, auc as pr_auc
+from sklearn.metrics import roc_curve, roc_auc_score
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.utils import resample
-from sklearn.metrics import confusion_matrix
+
+# 设置字体为Times New Roman
+plt.rcParams["font.family"] = ["Times New Roman", "serif"]
+plt.rcParams['axes.unicode_minus'] = False  # 正确显示负号
 
 try:
     # 加载模型
@@ -18,7 +20,7 @@ try:
 
     # 提取特征
     feature_columns = ['DR', 'Duration of DM', 'HbA1c', 'Serum creatinine', 'TC', 'Urine protein excretion', 'FBG',
-                       'BMI', 'LDL', 'SBP']
+                       'BMI']
     new_X = new_data[feature_columns]
 
     # 进行预测
@@ -42,7 +44,7 @@ try:
 
     # 计算 AUC
     auc = roc_auc_score(true_labels, y_pred_proba)
-    print(f"验证队列的 AUC: {auc}")
+    print(f"验证队列的 AUC: {auc:.3f}")
 
     # 计算 ROC 曲线
     fpr, tpr, thresholds = roc_curve(true_labels, y_pred_proba)
@@ -67,17 +69,25 @@ try:
     auc_lower = np.percentile(bootstrapped_aucs, 2.5)
     auc_upper = np.percentile(bootstrapped_aucs, 97.5)
 
+    # 输出95%置信区间
+    print(f"AUC的95%置信区间: [{auc_lower:.2f}, {auc_upper:.2f}]")
+
     # 绘制 ROC 曲线
     plt.figure(figsize=(8, 6))
-    plt.plot(fpr, tpr, label=f'ROC curve (area = {auc:.2f})')
-    plt.fill_between(base_fpr, tpr_lower, tpr_upper, color='grey', alpha=0.2, label='95% CI')
-    plt.plot([0, 1], [0, 1], 'k--')
+    plt.plot(fpr, tpr, label=f'ROC curve (AUC = {auc:.2f})', linewidth=2)
+    plt.fill_between(base_fpr, tpr_lower, tpr_upper, color='grey', alpha=0.3, label='95% CI')
+    plt.plot([0, 1], [0, 1], 'k--', linewidth=1.5)
+
     plt.xlim([-0.02, 1.02])
     plt.ylim([-0.02, 1.02])
-    plt.xlabel('False Positive Rate', fontsize=12)
-    plt.ylabel('True Positive Rate', fontsize=12)
-    plt.title('Receiver Operating Characteristic Curve', fontsize=14, pad=20)
-    plt.legend(loc="lower right", fontsize=10)
+    plt.xlabel('False Positive Rate', fontsize=14)
+    plt.ylabel('True Positive Rate', fontsize=14)
+    plt.title('Receiver Operating Characteristic Curve', fontsize=16, pad=20)
+    plt.legend(loc="lower right", fontsize=12)
+
+    # 调整刻度字体大小
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
 
     # 保存图片
     plt.savefig('外部验证_roc_curve.png', dpi=300, bbox_inches='tight')
@@ -86,61 +96,6 @@ try:
     # 显示图形（可选）
     plt.show()
 
-    # 计算 PR 曲线
-    precision, recall, _ = precision_recall_curve(true_labels, y_pred_proba)
-    pr_auc_score = pr_auc(recall, precision)
-
-    # 绘制 PR 曲线
-    plt.figure(figsize=(8, 6))
-    plt.plot(recall, precision, label=f'PR curve (area = {pr_auc_score:.2f})')
-    plt.xlabel('Recall', fontsize=12)
-    plt.ylabel('Precision', fontsize=12)
-    plt.title('Precision-Recall Curve', fontsize=14, pad=20)
-    plt.legend(loc="upper right", fontsize=10)
-    plt.xlim([-0.02, 1.02])
-    plt.ylim([-0.02, 1.02])
-
-    # 保存 PR 曲线图片
-    plt.savefig('外部验证_pr_curve.png', dpi=300, bbox_inches='tight')
-    print("PR 曲线已保存为 外部验证_pr_curve.png")
-
-    # 显示 PR 曲线图形（可选）
-    plt.show()
-
-    # 计算 DCA 曲线
-    thresholds = np.linspace(0, 1, 100)
-    net_benefits = []
-    all_treat = []
-    none_treat = []
-    for t in thresholds:
-        if t == 1:
-            continue  # 避免除以零的错误
-        y_pred_threshold = (y_pred_proba >= t).astype(int)
-        tn, fp, fn, tp = confusion_matrix(true_labels, y_pred_threshold).ravel()
-        n = len(true_labels)
-        net_benefit = (tp / n) - (fp / n) * (t / (1 - t))
-        net_benefits.append(net_benefit)
-        all_treat.append((sum(true_labels) / n) - ((n - sum(true_labels)) / n) * (t / (1 - t)))
-        none_treat.append(0)
-
-    # 绘制 DCA 曲线
-    plt.figure(figsize=(8, 6))
-    plt.plot(thresholds[:-1], net_benefits, label='Model')
-    plt.plot(thresholds[:-1], all_treat, label='Treat all', linestyle='--')
-    plt.plot(thresholds[:-1], none_treat, label='Treat none', linestyle='--')
-    plt.xlabel('Threshold probability', fontsize=12)
-    plt.ylabel('Net benefit', fontsize=12)
-    plt.title('Decision Curve Analysis', fontsize=14, pad=20)
-    plt.legend(loc="upper right", fontsize=10)
-    plt.xlim([0, 1])
-    plt.ylim([min(net_benefits + all_treat + none_treat) - 0.02, max(net_benefits + all_treat + none_treat) + 0.02])
-
-    # 保存 DCA 曲线图片
-    plt.savefig('外部验证_dca_curve.png', dpi=300, bbox_inches='tight')
-    print("DCA 曲线已保存为 外部验证_dca_curve.png")
-
-    # 显示 DCA 曲线图形（可选）
-    plt.show()
 
 except FileNotFoundError:
     print("文件未找到，请检查文件路径和文件名。")
@@ -148,3 +103,4 @@ except KeyError as e:
     print(f"数据中不存在名为 {e} 的列，请检查列名是否正确。")
 except Exception as e:
     print(f"发生未知错误：{e}")
+

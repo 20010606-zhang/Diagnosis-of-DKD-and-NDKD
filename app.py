@@ -26,7 +26,7 @@ plt.rcParams['font.family'] = 'Times New Roman'
 plt.rcParams['axes.unicode_minus'] = False
 
 # 定义特征和目标变量
-feature_names = ['DR', 'Duration of DM', 'HbA1c', 'Serum creatinine', 'TC', 'Urine protein excretion', 'FBG', 'BMI', 'LDL', 'SBP']
+feature_names = ['DR', 'Duration of DM', 'HbA1c', 'Serum creatinine', 'TC', 'Urine protein excretion', 'FBG', 'BMI']
 target_name = 'Pathology type'
 
 # Streamlit 应用标题
